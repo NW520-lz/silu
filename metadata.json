@@ -1,0 +1,6 @@
+{
+  "name": "入画 Silu",
+  "description": "专业极简 Android 实景虚线构图摄影与 AI 精修应用（Jetpack Compose）",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

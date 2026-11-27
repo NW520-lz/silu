@@ -1,0 +1,1906 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>入画 Silu — 极简摄影构图与 AI 精修</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0A0A0C;
+      --surface: #141417;
+      --glass: rgba(28, 28, 30, 0.72);
+      --glass-strong: rgba(22, 22, 25, 0.86);
+      --border: rgba(255, 255, 255, 0.12);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --emerald: #34D399;
+      --emerald-glow: rgba(52, 211, 153, 0.28);
+      --emerald-tint: rgba(52, 211, 153, 0.14);
+      --text-primary: #F5F5F7;
+      --text-secondary: #A1A1AA;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif;
+      letter-spacing: 0.01em;
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Clean 3-Zone Top Bar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      height: 56px;
+      padding: 0 28px;
+      background: rgba(10, 10, 12, 0.88);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 32px;
+    }
+
+    .brand {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--text-primary);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .nav-link {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 6px 0;
+      position: relative;
+      white-space: nowrap;
+      transition: color 160ms ease;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--text-primary);
+    }
+
+    .nav-link.active::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: -1px;
+      height: 2px;
+      border-radius: 99px;
+      background: var(--emerald);
+    }
+
+    .mode-btn {
+      background: rgba(28, 28, 30, 0.8);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 160ms ease, background 160ms ease;
+    }
+
+    .mode-btn:hover {
+      border-color: rgba(52, 211, 153, 0.55);
+      background: rgba(52, 211, 153, 0.12);
+    }
+
+    /* Main Stage */
+    .stage {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+    }
+
+    .grid-all {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 20px;
+      align-items: start;
+      justify-items: center;
+    }
+
+    .grid-single {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 8px;
+    }
+
+    .device-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      transition: opacity 200ms ease, transform 200ms ease;
+    }
+
+    .device-col.dimmed {
+      opacity: 0.45;
+    }
+
+    .device-caption {
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .device-caption strong {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* Scaled wrapper so true 393x852 fits 4-across on 1440px cleanly */
+    .scale-wrap {
+      width: 322px;
+      height: 698px;
+      position: relative;
+    }
+
+    .grid-single .scale-wrap {
+      width: 393px;
+      height: 852px;
+    }
+
+    .phone-frame {
+      width: 393px;
+      height: 852px;
+      border-radius: 48px;
+      background: var(--bg);
+      border: 1.5px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72), inset 0 0 0 2px rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+      position: relative;
+      transform-origin: top left;
+      transform: scale(0.8193);
+      user-select: none;
+    }
+
+    .grid-single .phone-frame {
+      transform: scale(1);
+    }
+
+    /* Status Bar & Dynamic Island */
+    .status-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 48px;
+      padding: 14px 28px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .status-time {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .dynamic-island {
+      position: absolute;
+      top: 11px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 112px;
+      height: 30px;
+      border-radius: 999px;
+      background: #000;
+      border: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 11px;
+    }
+
+    .camera-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--emerald);
+      opacity: 0.9;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #fff;
+    }
+
+    .home-bar {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 134px;
+      height: 4.5px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.72);
+      z-index: 40;
+      pointer-events: none;
+    }
+
+    .screen {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      position: relative;
+    }
+
+    /* Screen 1: Camera */
+    .cam-header {
+      padding: 54px 16px 12px;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .cam-left-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease;
+    }
+
+    .icon-btn:hover { background: rgba(255,255,255,0.08); }
+
+    .ratio-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 7px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .align-capsule {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 13px;
+      border-radius: 999px;
+      background: rgba(17, 28, 23, 0.85);
+      border: 1px solid rgba(52, 211, 153, 0.48);
+      box-shadow: 0 0 22px rgba(52, 211, 153, 0.24);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 180ms ease;
+    }
+
+    .align-capsule.tilted {
+      background: var(--glass);
+      border-color: var(--border);
+      box-shadow: none;
+      color: var(--text-secondary);
+    }
+
+    .viewfinder {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      cursor: ew-resize;
+    }
+
+    .vf-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .vf-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .vf-degree {
+      position: absolute;
+      left: 30px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: var(--emerald);
+      pointer-events: none;
+    }
+
+    .vf-tone-label {
+      position: absolute;
+      left: 16px;
+      bottom: 12px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.75);
+      text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+      pointer-events: none;
+    }
+
+    .shutter-flash {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease;
+    }
+
+    .shutter-flash.active { opacity: 0.82; }
+
+    .cam-deck {
+      background: var(--glass-strong);
+      backdrop-filter: blur(28px);
+      border-top: 1px solid var(--border);
+      border-radius: 28px 28px 0 0;
+      padding: 10px 0 30px;
+      margin-top: -20px;
+      z-index: 15;
+    }
+
+    .grab-handle {
+      width: 38px;
+      height: 4px;
+      border-radius: 99px;
+      background: rgba(255,255,255,0.28);
+      margin: 0 auto 12px;
+      cursor: pointer;
+    }
+
+    .pose-strip {
+      display: flex;
+      gap: 10px;
+      padding: 0 16px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .pose-strip::-webkit-scrollbar { display: none; }
+
+    .pose-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .pose-box {
+      width: 58px;
+      height: 58px;
+      border-radius: 14px;
+      background: rgba(18, 18, 21, 0.7);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+
+    .pose-card.active .pose-box {
+      border: 1.5px solid #fff;
+      background: rgba(38, 38, 44, 0.9);
+    }
+
+    .pose-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .pose-card.active .pose-label {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .shutter-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px 0;
+    }
+
+    .import-mini {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    .import-mini span {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .shutter-btn {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      border: 2.5px solid #fff;
+      background: transparent;
+      padding: 5px;
+      cursor: pointer;
+      transition: transform 120ms ease;
+    }
+
+    .shutter-btn:active { transform: scale(0.91); }
+
+    .shutter-core {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 34%, #ededf2, #b9b9c3 68%, #9898a2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .shutter-inner {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #e4e4eb, #adadb8, #ededf3);
+      border: 1px solid rgba(0,0,0,0.22);
+    }
+
+    .album-thumb {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      padding: 0;
+      background: #111;
+    }
+
+    .album-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Screen 2: Template Drawer */
+    .drawer-backdrop {
+      height: 150px;
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .drawer-backdrop img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: blur(18px) brightness(0.45);
+      transform: scale(1.12);
+    }
+
+    .drawer-sheet {
+      flex: 1;
+      margin-top: -28px;
+      border-radius: 28px 28px 0 0;
+      background: var(--glass-strong);
+      backdrop-filter: blur(30px);
+      border-top: 1px solid var(--border);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 16px 26px;
+      overflow: hidden;
+    }
+
+    .import-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(34, 34, 38, 0.86);
+      border: 1px solid rgba(52, 211, 153, 0.32);
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+
+    .import-banner:hover {
+      border-color: var(--emerald);
+      background: rgba(38, 44, 42, 0.9);
+    }
+
+    .import-banner-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .import-banner-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 3px;
+    }
+
+    .cat-tabs {
+      display: flex;
+      gap: 20px;
+      padding: 16px 2px 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .cat-tabs::-webkit-scrollbar { display: none; }
+
+    .cat-tab {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      padding-bottom: 7px;
+      position: relative;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .cat-tab.active {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .cat-tab.active::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 0;
+      width: 22px;
+      height: 2px;
+      border-radius: 99px;
+      background: #fff;
+    }
+
+    .tpl-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      overflow-y: auto;
+      padding-bottom: 12px;
+      scrollbar-width: none;
+    }
+    .tpl-grid::-webkit-scrollbar { display: none; }
+
+    .tpl-card {
+      background: none;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .tpl-thumb {
+      position: relative;
+      aspect-ratio: 3 / 4;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .tpl-card.active .tpl-thumb {
+      border: 1.5px solid var(--emerald);
+    }
+
+    .tpl-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .tpl-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(14, 14, 17, 0.68);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tpl-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 7px;
+      gap: 6px;
+    }
+
+    .tpl-name {
+      font-size: 13px;
+      color: var(--text-primary);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tpl-count {
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    /* Screen 3: AI Retouch Agent */
+    .retouch-canvas {
+      height: 64%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .retouch-canvas img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: filter 260ms ease;
+    }
+
+    .retouch-warm-glow {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 65% 28%, rgba(255, 180, 84, 0.22), rgba(255, 155, 65, 0.08) 45%, transparent 75%);
+      pointer-events: none;
+      transition: opacity 260ms ease;
+    }
+
+    .retouch-top-actions {
+      position: absolute;
+      top: 54px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 15;
+    }
+
+    .glass-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .compare-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 76px;
+      background: linear-gradient(180deg, transparent, rgba(52, 211, 153, 0.28), rgba(52, 211, 153, 0.75), transparent);
+      top: -80px;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .scan-line.running {
+      opacity: 1;
+      animation: sweepDown 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes sweepDown {
+      0% { top: -80px; opacity: 0.9; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    .agent-panel {
+      flex: 1;
+      margin-top: -22px;
+      border-radius: 28px 28px 0 0;
+      background: var(--glass-strong);
+      backdrop-filter: blur(30px);
+      border-top: 1px solid var(--border);
+      padding: 10px 16px 28px;
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hero-ai-btn {
+      width: calc(100% - 16px);
+      margin: 0 auto;
+      height: 48px;
+      border-radius: 999px;
+      background: #0C1A15;
+      border: 1.4px solid var(--emerald);
+      box-shadow: 0 0 26px var(--emerald-glow);
+      color: var(--emerald);
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 140ms ease, background 160ms ease;
+    }
+
+    .hero-ai-btn:hover { background: #10251E; }
+    .hero-ai-btn:active { transform: scale(0.98); }
+
+    .intent-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 2px 0;
+    }
+    .intent-row::-webkit-scrollbar { display: none; }
+
+    .intent-chip {
+      padding: 8px 13px;
+      border-radius: 999px;
+      background: rgba(28, 28, 30, 0.78);
+      border: 1px solid var(--border);
+      color: rgba(245, 245, 247, 0.88);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 150ms ease;
+    }
+
+    .intent-chip.active {
+      background: var(--emerald-tint);
+      border-color: rgba(52, 211, 153, 0.65);
+      color: var(--emerald);
+      font-weight: 500;
+    }
+
+    .prompt-bar {
+      height: 50px;
+      border-radius: 999px;
+      background: rgba(12, 12, 15, 0.8);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 6px 0 10px;
+      gap: 10px;
+    }
+
+    .orb {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, #34D399, #93C5FD, #E5E7EB, #34D399);
+      border: 1px solid rgba(255,255,255,0.28);
+      flex-shrink: 0;
+    }
+
+    .prompt-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 12.5px;
+      font-family: inherit;
+    }
+
+    .prompt-input::placeholder { color: var(--text-secondary); }
+
+    .mic-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(38, 38, 42, 0.85);
+      border: none;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 150ms ease;
+    }
+
+    .mic-btn.send { background: var(--emerald); color: var(--bg); }
+
+    /* Screen 4: Compare & Save */
+    .compare-header {
+      padding: 54px 16px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .compare-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .history-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .compare-stage {
+      flex: 1;
+      margin: 4px 16px 12px;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      position: relative;
+      cursor: ew-resize;
+      touch-action: none;
+    }
+
+    .compare-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .img-original {
+      filter: saturate(0.76) contrast(0.92) brightness(0.90) hue-rotate(-8deg);
+    }
+
+    .img-retouched {
+      filter: saturate(1.09) contrast(1.04) brightness(1.03) sepia(0.08);
+    }
+
+    .split-line {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 1.5px;
+      background: rgba(255, 255, 255, 0.95);
+      pointer-events: none;
+      z-index: 12;
+    }
+
+    .split-handle {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #fff;
+      color: #0A0A0C;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      pointer-events: none;
+      z-index: 13;
+    }
+
+    .badge-tag {
+      position: absolute;
+      top: 12px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: rgba(18, 18, 21, 0.68);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+      z-index: 14;
+      pointer-events: none;
+    }
+
+    .compare-dock {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      padding: 16px 20px 30px;
+    }
+
+    .lock-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .lock-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .lock-sub {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .ios-switch {
+      width: 50px;
+      height: 30px;
+      border-radius: 999px;
+      background: #2C2C30;
+      border: 1px solid var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background 180ms ease;
+    }
+
+    .ios-switch.on {
+      background: var(--emerald);
+      border-color: transparent;
+    }
+
+    .ios-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .ios-switch.on::after {
+      transform: translateX(20px);
+    }
+
+    .dock-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      height: 50px;
+      border-radius: 999px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      flex: 1.32;
+      height: 50px;
+      border-radius: 999px;
+      background: var(--emerald);
+      border: none;
+      color: #0A0A0C;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 150ms ease, transform 120ms ease;
+    }
+
+    .btn-primary:hover { filter: brightness(1.06); }
+    .btn-primary:active { transform: scale(0.98); }
+
+    .toast {
+      position: fixed;
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      padding: 9px 18px;
+      border-radius: 999px;
+      background: rgba(14, 28, 22, 0.94);
+      border: 1px solid rgba(52, 211, 153, 0.55);
+      color: var(--emerald);
+      font-size: 12.5px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 220ms ease;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .history-popover {
+      position: absolute;
+      top: 96px;
+      right: 16px;
+      width: 240px;
+      background: var(--glass-strong);
+      backdrop-filter: blur(24px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      z-index: 30;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .history-popover.open { display: flex; }
+
+    .history-item {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(36, 36, 40, 0.6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .history-item span { color: var(--text-secondary); font-size: 10px; }
+
+    @media (max-width: 1360px) {
+      .grid-all { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+    }
+
+    @media (max-width: 760px) {
+      .topbar { padding: 0 16px; gap: 12px; }
+      .nav-links { gap: 14px; }
+      .grid-all { grid-template-columns: 1fr; }
+      .stage { padding: 12px 0 28px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">入画 Silu</div>
+    <nav class="nav-links" aria-label="核心页面导航">
+      <button class="nav-link active" data-screen="0">实时构图</button>
+      <button class="nav-link" data-screen="1">模板抽屉</button>
+      <button class="nav-link" data-screen="2">AI 精修</button>
+      <button class="nav-link" data-screen="3">对比保存</button>
+    </nav>
+    <button class="mode-btn" id="viewModeBtn">单机沉浸体验</button>
+  </header>
+
+  <div class="toast" id="toast"></div>
+  <input type="file" id="photoImportInput" accept="image/*" hidden />
+
+  <main class="stage">
+    <section class="grid-all" id="screensRoot">
+      <!-- Screen 1: 实时虚线构图相机 -->
+      <div class="device-col" data-col="0">
+        <div class="device-caption"><strong>01. 实时虚线构图相机</strong> · 393×852pt</div>
+        <div class="scale-wrap">
+          <div class="phone-frame">
+            <div class="status-bar">
+              <span class="status-time mono">14:32</span>
+              <div class="dynamic-island"><span class="camera-dot"></span></div>
+              <div class="status-icons">
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><rect x="0" y="7" width="2.5" height="4" rx="0.8"/><rect x="4" y="5" width="2.5" height="6" rx="0.8"/><rect x="8" y="2.5" width="2.5" height="8.5" rx="0.8"/><rect x="12" y="0" width="2.5" height="11" rx="0.8"/></svg>
+                <svg width="22" height="11" viewBox="0 0 22 11" fill="none"><rect x="0.7" y="0.7" width="18" height="9.6" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="2.5" y="2.5" width="13.5" height="6" rx="1.2" fill="currentColor"/><rect x="20" y="3.5" width="1.6" height="4" rx="0.8" fill="currentColor"/></svg>
+              </div>
+            </div>
+
+            <div class="screen">
+              <div class="cam-header">
+                <div class="cam-left-tools">
+                  <button class="icon-btn" id="flashBtn" title="闪光灯">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  </button>
+                  <button class="ratio-btn mono" id="ratioBtn">3:4</button>
+                </div>
+
+                <button class="align-capsule" id="alignCapsule">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" id="alignIcon"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span id="alignText">构图已对齐 · 角度完美</span>
+                </button>
+
+                <button class="icon-btn" id="guideToggleBtn" title="切换虚线引导">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+
+              <div class="viewfinder" id="viewfinder">
+                <img src="/drawables/camera_cafe_portrait.jpg" alt="实时人像取景画面" class="vf-img" id="vfImg" />
+                <svg class="vf-svg" viewBox="0 0 393 524" preserveAspectRatio="none" id="poseSvg"></svg>
+                <svg class="vf-svg" viewBox="0 0 393 524" preserveAspectRatio="none" id="rulerSvg"></svg>
+                <span class="vf-degree mono" id="vfDegree">0.0°</span>
+                <span class="vf-tone-label" id="vfToneLabel">咖啡日常 · 徕卡暖棕胶片</span>
+                <div class="shutter-flash" id="shutterFlash"></div>
+              </div>
+
+              <div class="cam-deck">
+                <div class="grab-handle" data-jump="1" title="打开构图模板抽屉"></div>
+                <div class="pose-strip" id="poseStrip"></div>
+                <div class="shutter-row">
+                  <button class="import-mini" id="camImportBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="3"/><circle cx="8" cy="8" r="1.4"/><path d="M3 13l4-4 3 3 2-2 5 5"/><path d="M19 14v6M16 17h6"/></svg>
+                    <span>导入样图</span>
+                  </button>
+                  <button class="shutter-btn" id="shutterBtn" aria-label="拍摄">
+                    <div class="shutter-core"><div class="shutter-inner"></div></div>
+                  </button>
+                  <button class="album-thumb" id="albumThumbBtn" aria-label="打开最新照片精修">
+                    <img src="/drawables/retouch_hero_portrait.jpg" alt="相册缩略图" id="albumThumbImg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="home-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen 2: 构图模板抽屉 -->
+      <div class="device-col" data-col="1">
+        <div class="device-caption"><strong>02. 构图模板抽屉</strong> · 393×852pt</div>
+        <div class="scale-wrap">
+          <div class="phone-frame">
+            <div class="status-bar">
+              <span class="status-time mono">14:32</span>
+              <div class="dynamic-island"></div>
+              <div class="status-icons">
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><rect x="0" y="7" width="2.5" height="4" rx="0.8"/><rect x="4" y="5" width="2.5" height="6" rx="0.8"/><rect x="8" y="2.5" width="2.5" height="8.5" rx="0.8"/><rect x="12" y="0" width="2.5" height="11" rx="0.8"/></svg>
+                <svg width="22" height="11" viewBox="0 0 22 11" fill="none"><rect x="0.7" y="0.7" width="18" height="9.6" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="2.5" y="2.5" width="13.5" height="6" rx="1.2" fill="currentColor"/><rect x="20" y="3.5" width="1.6" height="4" rx="0.8" fill="currentColor"/></svg>
+              </div>
+            </div>
+
+            <div class="screen">
+              <div class="drawer-backdrop">
+                <img src="/drawables/camera_cafe_portrait.jpg" alt="模糊取景背景" id="drawerBackdropImg" />
+              </div>
+              <div class="drawer-sheet">
+                <div class="grab-handle" data-jump="0" title="收起抽屉"></div>
+                <button class="import-banner" id="drawerImportBanner">
+                  <svg width="42" height="28" viewBox="0 0 42 28" fill="none">
+                    <rect x="1.5" y="3" width="17" height="22" rx="4" stroke="#D4D4D8" stroke-width="1.4"/>
+                    <circle cx="7" cy="10" r="1.8" fill="#D4D4D8"/>
+                    <rect x="23.5" y="3" width="17" height="22" rx="4" stroke="#34D399" stroke-width="1.4" stroke-dasharray="3 2.5"/>
+                    <path d="M17 14h9m0 0-2.5-2.5M26 14l-2.5 2.5" stroke="#34D399" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <div style="flex:1; min-width:0;">
+                    <div class="import-banner-title">导入任意美图</div>
+                    <div class="import-banner-sub">自动提取构图虚线与同款色调</div>
+                  </div>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+
+                <div class="cat-tabs" id="catTabs"></div>
+                <div class="tpl-grid" id="tplGrid"></div>
+              </div>
+            </div>
+            <div class="home-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen 3: AI 修图 Agent 精修页 -->
+      <div class="device-col" data-col="2">
+        <div class="device-caption"><strong>03. AI 修图 Agent 精修页</strong> · 393×852pt</div>
+        <div class="scale-wrap">
+          <div class="phone-frame">
+            <div class="status-bar">
+              <span class="status-time mono">14:33</span>
+              <div class="dynamic-island"></div>
+              <div class="status-icons">
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><rect x="0" y="7" width="2.5" height="4" rx="0.8"/><rect x="4" y="5" width="2.5" height="6" rx="0.8"/><rect x="8" y="2.5" width="2.5" height="8.5" rx="0.8"/><rect x="12" y="0" width="2.5" height="11" rx="0.8"/></svg>
+                <svg width="22" height="11" viewBox="0 0 22 11" fill="none"><rect x="0.7" y="0.7" width="18" height="9.6" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="2.5" y="2.5" width="13.5" height="6" rx="1.2" fill="currentColor"/><rect x="20" y="3.5" width="1.6" height="4" rx="0.8" fill="currentColor"/></svg>
+              </div>
+            </div>
+
+            <div class="screen">
+              <div class="retouch-canvas">
+                <img src="/drawables/retouch_hero_portrait.jpg" alt="待精修高清人像" id="retouchImg" />
+                <div class="retouch-warm-glow" id="retouchGlow"></div>
+                <div class="scan-line" id="scanLine"></div>
+                <div class="retouch-top-actions">
+                  <button class="glass-circle" data-jump="0" aria-label="返回相机">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <button class="compare-pill" id="holdCompareBtn">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                    <span id="holdCompareText">对比原图</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="agent-panel">
+                <div class="grab-handle"></div>
+                <button class="hero-ai-btn" id="oneTapAiBtn">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg>
+                  <span id="oneTapAiText">按构图模板一键精修</span>
+                </button>
+
+                <div class="intent-row" id="intentRow"></div>
+
+                <div class="prompt-bar">
+                  <div class="orb"></div>
+                  <input type="text" class="prompt-input" id="agentPromptInput" placeholder="补充你的微调需求，例如：把背景路人去掉，保留脸部真实感…" />
+                  <button class="mic-btn" id="micSendBtn" aria-label="语音或发送">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="home-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen 4: 精修前后对比与保存页 -->
+      <div class="device-col" data-col="3">
+        <div class="device-caption"><strong>04. 精修前后对比与保存页</strong> · 393×852pt</div>
+        <div class="scale-wrap">
+          <div class="phone-frame">
+            <div class="status-bar">
+              <span class="status-time mono">14:33</span>
+              <div class="dynamic-island"></div>
+              <div class="status-icons">
+                <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><rect x="0" y="7" width="2.5" height="4" rx="0.8"/><rect x="4" y="5" width="2.5" height="6" rx="0.8"/><rect x="8" y="2.5" width="2.5" height="8.5" rx="0.8"/><rect x="12" y="0" width="2.5" height="11" rx="0.8"/></svg>
+                <svg width="22" height="11" viewBox="0 0 22 11" fill="none"><rect x="0.7" y="0.7" width="18" height="9.6" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="2.5" y="2.5" width="13.5" height="6" rx="1.2" fill="currentColor"/><rect x="20" y="3.5" width="1.6" height="4" rx="0.8" fill="currentColor"/></svg>
+              </div>
+            </div>
+
+            <div class="screen">
+              <div class="compare-header">
+                <button class="icon-btn" data-jump="2" aria-label="返回精修">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <span class="compare-title">AI 智能精修</span>
+                <button class="history-btn" id="historyToggleBtn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><polyline points="12 7 12 12 15 14"/></svg>
+                  <span>历史</span>
+                </button>
+              </div>
+
+              <div class="history-popover" id="historyPopover">
+                <div style="font-size:11px; color:#A1A1AA;">精修版本历史</div>
+                <div class="history-item">按模板一键精修 · 暖阳逆光 <span class="mono">14:33</span></div>
+                <div class="history-item">无痕去路人 · 五官锁定 <span class="mono">14:32</span></div>
+                <div class="history-item">相机直出原图 <span class="mono">14:31</span></div>
+              </div>
+
+              <div class="compare-stage" id="compareStage">
+                <img src="/drawables/retouch_hero_portrait.jpg" alt="AI 精修效果" class="compare-img img-retouched" id="compareAfterImg" />
+                <div class="retouch-warm-glow" id="compareGlow"></div>
+                <img src="/drawables/retouch_hero_portrait.jpg" alt="原图" class="compare-img img-original" id="compareBeforeImg" style="clip-path: inset(0 50% 0 0);" />
+                <span class="badge-tag" style="left:12px;">原图</span>
+                <span class="badge-tag" style="right:12px;">AI 精修</span>
+                <div class="split-line" id="splitLine" style="left:50%;"></div>
+                <div class="split-handle" id="splitHandle" style="left:50%;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 3 12 9 6"/><polyline points="15 6 21 12 15 18"/></svg>
+                </div>
+              </div>
+
+              <div class="compare-dock">
+                <div class="lock-row">
+                  <div>
+                    <div class="lock-title">五官原貌锁定</div>
+                    <div class="lock-sub" id="lockSubText">已锁定原生骨骼与皮肤质感</div>
+                  </div>
+                  <button class="ios-switch on" id="faceLockSwitch" role="switch" aria-checked="true" aria-label="五官原貌锁定"></button>
+                </div>
+                <div class="dock-actions">
+                  <button class="btn-secondary" data-jump="2">继续对话微调</button>
+                  <button class="btn-primary" id="saveLosslessBtn">无损保存到相册</button>
+                </div>
+              </div>
+            </div>
+            <div class="home-bar"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const POSES = [
+      { id: 'street_side', label: '街角侧身' },
+      { id: 'cafe_daily', label: '咖啡日常' },
+      { id: 'street_walk', label: '街头漫步' },
+      { id: 'seaside_back', label: '海边逆光' },
+      { id: 'tall_full', label: '显高全身' },
+    ];
+
+    const CATEGORIES = ['推荐', '街拍', '咖啡馆', '海边', '显高全身'];
+
+    const TEMPLATES = [
+      { id: 't1', title: '午后咖啡馆', cat: '咖啡馆', pose: 'street_side', count: '1.8w 人使用', tone: '窗边自然柔光', img: '/drawables/tpl_cafe_afternoon.jpg' },
+      { id: 't2', title: '街头漫游', cat: '街拍', pose: 'street_walk', count: '3.1w 人使用', tone: '低饱和胶片街拍', img: '/drawables/tpl_street_walk.jpg' },
+      { id: 't3', title: '日落余晖', cat: '海边', pose: 'seaside_back', count: '2.9w 人使用', tone: '落日琥珀逆光', img: '/drawables/tpl_seaside_sunset.jpg' },
+      { id: 't4', title: '建筑显高全身', cat: '显高全身', pose: 'tall_full', count: '1.5w 人使用', tone: '极简冷暖光影', img: '/drawables/tpl_tall_fullbody.jpg' },
+      { id: 't5', title: '咖啡日常 · 抬手', cat: '咖啡馆', pose: 'cafe_daily', count: '2.4w 人使用', tone: '徕卡暖棕胶片', img: '/drawables/camera_cafe_portrait.jpg' },
+      { id: 't6', title: '街角回眸逆光', cat: '街拍', pose: 'street_side', count: '2.1w 人使用', tone: '黄金时刻轮廓光', img: '/drawables/retouch_hero_portrait.jpg' },
+    ];
+
+    const INTENTS = ['无痕去路人', '自然皮肤保真', '重塑暖阳逆光', '衣服去褶皱'];
+
+    const state = {
+      singleMode: false,
+      activeScreen: 0,
+      pose: 'cafe_daily',
+      selectedTpl: 't5',
+      category: '推荐',
+      tilt: 0.0,
+      showGuide: true,
+      flashOn: false,
+      ratios: ['3:4', '4:5', '9:16'],
+      ratioIdx: 0,
+      activeIntents: new Set(['无痕去路人', '自然皮肤保真', '重塑暖阳逆光']),
+      faceLock: true,
+      retouchSrc: '/drawables/retouch_hero_portrait.jpg',
+      splitPct: 50,
+    };
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    function poseThumbSvg(poseId, dashed = false, color = '#F5F5F7') {
+      const d = dashed ? 'stroke-dasharray="2.5 2"' : '';
+      const map = {
+        cafe_daily: `<circle cx="13" cy="6.2" r="3" ${d}/><path d="M7.5 21L8.5 12L5.5 10.5L9.2 6.5M10 10.8C13.5 9.8 16.5 11.2 17.4 14L16.4 21" ${d}/>`,
+        street_side: `<circle cx="12.5" cy="5.8" r="3" ${d}/><path d="M7 21C7.2 13.5 8.8 10.5 11.8 10.2C15.5 10.4 17 13.8 17.3 21" ${d}/>`,
+        street_walk: `<circle cx="12" cy="4.8" r="2.6" ${d}/><path d="M12 8L11.5 14.5L8 21M11.5 14.5L16 21M11.8 10L8 13M11.8 10L15.8 13.4" ${d}/>`,
+        seaside_back: `<circle cx="12" cy="6" r="3" ${d}/><path d="M8.2 21C8.4 14.5 8.5 11 10.5 10.4H13.5C15.5 11 15.6 14.5 15.8 21" ${d}/>`,
+        tall_full: `<circle cx="12" cy="4.4" r="2.4" ${d}/><path d="M9.2 21.5L10 9.6H14L14.8 21.5M8.2 13.4H15.8" ${d}/>`,
+      };
+      return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">${map[poseId] || map.cafe_daily}</svg>`;
+    }
+
+    function renderPoseOverlay() {
+      const svg = document.getElementById('poseSvg');
+      if (!state.showGuide) { svg.innerHTML = ''; return; }
+      const aligned = Math.abs(state.tilt) <= 0.6;
+      const glow = aligned ? 'rgba(52,211,153,0.34)' : 'rgba(255,255,255,0.14)';
+      const line = aligned ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.72)';
+      const accent = aligned ? '#34D399' : 'rgba(255,255,255,0.75)';
+
+      let content = '';
+      if (state.pose === 'cafe_daily') {
+        const d = 'M130 430 C138 368 142 314 146 272 C106 262 90 256 95 236 C102 210 122 183 138 162 C150 146 169 146 181 157 C200 136 236 142 248 178 C260 210 260 230 272 246 C284 272 280 356 260 445';
+        content = `
+          <path d="${d}" fill="none" stroke="${glow}" stroke-width="8" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <path d="${d}" fill="none" stroke="${line}" stroke-width="1.7" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <ellipse cx="207" cy="186" rx="35" ry="38" fill="none" stroke="${glow}" stroke-width="6"/>
+          <ellipse cx="207" cy="186" rx="35" ry="38" fill="none" stroke="${accent}" stroke-width="1.6"/>
+          <line x1="176" y1="185" x2="238" y2="185" stroke="rgba(255,255,255,0.82)" stroke-width="1"/>
+          <line x1="205" y1="152" x2="205" y2="220" stroke="rgba(255,255,255,0.82)" stroke-width="1"/>
+          <path d="M163 168 L142 194 L110 246 L169 262" fill="none" stroke="${accent}" stroke-width="1.3" stroke-dasharray="4 4"/>
+          <path d="M244 241 L260 267 L252 351 L238 440" fill="none" stroke="${accent}" stroke-width="1.3" stroke-dasharray="4 4"/>
+          <line x1="145" y1="364" x2="232" y2="364" stroke="rgba(255,255,255,0.65)" stroke-width="1.1" stroke-dasharray="4 4"/>
+          ${[[163,168],[110,246],[260,267],[252,351],[238,440]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="5.5" fill="${glow}"/><circle cx="${x}" cy="${y}" r="2.7" fill="${accent}"/>`).join('')}
+        `;
+      } else if (state.pose === 'street_walk') {
+        const d = 'M142 460 L161 362 C142 298 150 230 169 199 C173 146 216 146 224 199 C244 236 255 304 240 372 L260 460';
+        content = `
+          <path d="${d}" fill="none" stroke="${glow}" stroke-width="8" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <path d="${d}" fill="none" stroke="${line}" stroke-width="1.7" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <ellipse cx="198" cy="176" rx="26" ry="29" fill="none" stroke="${accent}" stroke-width="1.6"/>
+          <line x1="197" y1="215" x2="192" y2="366" stroke="${accent}" stroke-width="1.2" stroke-dasharray="4 4"/>
+        `;
+      } else if (state.pose === 'seaside_back') {
+        const d = 'M146 470 C150 377 154 304 146 256 C150 225 165 215 169 188 C173 142 220 142 224 188 C228 215 244 225 248 256 C240 304 244 377 248 470';
+        content = `
+          <line x1="30" y1="230" x2="363" y2="230" stroke="${accent}" stroke-opacity="0.45" stroke-width="1" stroke-dasharray="4 4"/>
+          <path d="${d}" fill="none" stroke="${glow}" stroke-width="8" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <path d="${d}" fill="none" stroke="${line}" stroke-width="1.7" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <ellipse cx="197" cy="175" rx="26" ry="30" fill="none" stroke="${accent}" stroke-width="1.6"/>
+        `;
+      } else if (state.pose === 'tall_full') {
+        const d = 'M161 482 L169 304 C153 256 153 210 169 184 C177 126 216 126 224 184 C240 210 240 256 224 304 L232 482';
+        content = `
+          <path d="${d}" fill="none" stroke="${glow}" stroke-width="8" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <path d="${d}" fill="none" stroke="${line}" stroke-width="1.7" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <ellipse cx="197" cy="158" rx="22" ry="25" fill="none" stroke="${accent}" stroke-width="1.6"/>
+          <line x1="134" y1="278" x2="260" y2="278" stroke="${accent}" stroke-width="1.2" stroke-dasharray="4 4"/>
+          <line x1="142" y1="482" x2="252" y2="482" stroke="${line}" stroke-opacity="0.55" stroke-width="1.2"/>
+        `;
+      } else {
+        const d = 'M130 470 C118 377 118 293 138 251 C154 225 161 199 165 168 C173 120 228 120 244 168 C252 210 248 246 264 283 C283 346 291 414 295 470';
+        content = `
+          <path d="${d}" fill="none" stroke="${glow}" stroke-width="8" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <path d="${d}" fill="none" stroke="${line}" stroke-width="1.7" stroke-dasharray="7 5" stroke-linecap="round"/>
+          <ellipse cx="204" cy="172" rx="36" ry="40" fill="none" stroke="${accent}" stroke-width="1.6"/>
+          <line x1="138" y1="268" x2="252" y2="278" stroke="${accent}" stroke-width="1.2" stroke-dasharray="4 4"/>
+        `;
+      }
+      svg.innerHTML = content;
+    }
+
+    function renderTiltRuler() {
+      const svg = document.getElementById('rulerSvg');
+      const aligned = Math.abs(state.tilt) <= 0.6;
+      const accent = aligned ? '#34D399' : 'rgba(255,255,255,0.85)';
+      const topY = 172, h = 180, ticks = 28;
+      let parts = '';
+      for (let i = 0; i <= ticks; i++) {
+        const y = topY + (i / ticks) * h;
+        const isCenter = i === ticks / 2;
+        const isMajor = i % 7 === 0;
+        const len = isCenter ? 12 : (isMajor ? 8 : 4.5);
+        const stroke = isCenter ? accent : (isMajor ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.28)');
+        const sw = isCenter ? 1.3 : 0.8;
+        parts += `<line x1="14" y1="${y}" x2="${14+len}" y2="${y}" stroke="${stroke}" stroke-width="${sw}"/>`;
+        parts += `<line x1="${379-len}" y1="${y}" x2="379" y2="${y}" stroke="${stroke}" stroke-width="${sw}"/>`;
+      }
+      const offset = (Math.max(-5, Math.min(5, state.tilt)) / 5) * 55;
+      const ly = 262 + offset, ry = 262 - offset;
+      parts += `<polygon points="10,${ly} 4,${ly-3.5} 4,${ly+3.5}" fill="${accent}"/>`;
+      parts += `<polygon points="383,${ry} 389,${ry-3.5} 389,${ry+3.5}" fill="${accent}"/>`;
+      svg.innerHTML = parts;
+
+      const cap = document.getElementById('alignCapsule');
+      const txt = document.getElementById('alignText');
+      const icon = document.getElementById('alignIcon');
+      const deg = document.getElementById('vfDegree');
+      deg.textContent = `${Math.abs(state.tilt).toFixed(1)}°`;
+      deg.style.color = aligned ? '#34D399' : 'rgba(255,255,255,0.8)';
+      if (aligned) {
+        cap.classList.remove('tilted');
+        txt.textContent = '构图已对齐 · 角度完美';
+        icon.style.display = 'block';
+      } else {
+        cap.classList.add('tilted');
+        txt.textContent = `微调倾角 · ${Math.abs(state.tilt).toFixed(1)}°`;
+        icon.style.display = 'none';
+      }
+    }
+
+    function renderPoseStrip() {
+      const strip = document.getElementById('poseStrip');
+      strip.innerHTML = `
+        <button class="pose-card" data-open-drawer="1">
+          <div class="pose-box">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          </div>
+          <span class="pose-label">模板库</span>
+        </button>
+      ` + POSES.map(p => `
+        <button class="pose-card ${state.pose === p.id ? 'active' : ''}" data-pose="${p.id}">
+          <div class="pose-box">${poseThumbSvg(p.id, false, state.pose === p.id ? '#FFFFFF' : '#A1A1AA')}</div>
+          <span class="pose-label">${p.label}</span>
+        </button>
+      `).join('');
+
+      strip.querySelectorAll('[data-pose]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.pose = btn.dataset.pose;
+          const matched = TEMPLATES.find(t => t.pose === state.pose);
+          if (matched) applyTemplate(matched, false);
+          renderPoseStrip();
+          renderPoseOverlay();
+        });
+      });
+      strip.querySelector('[data-open-drawer]')?.addEventListener('click', () => focusScreen(1));
+    }
+
+    function applyTemplate(tpl, notify = true) {
+      state.selectedTpl = tpl.id;
+      state.pose = tpl.pose;
+      document.getElementById('vfImg').src = tpl.img;
+      document.getElementById('drawerBackdropImg').src = tpl.img;
+      document.getElementById('vfToneLabel').textContent = `${POSES.find(p=>p.id===tpl.pose)?.label || '自定义'} · ${tpl.tone}`;
+      renderPoseStrip();
+      renderPoseOverlay();
+      renderTemplates();
+      if (notify) {
+        showToast(`已应用「${tpl.title}」构图虚线与色调`);
+        if (state.singleMode) focusScreen(0);
+      }
+    }
+
+    function renderCategories() {
+      const box = document.getElementById('catTabs');
+      box.innerHTML = CATEGORIES.map(c => `<button class="cat-tab ${state.category === c ? 'active' : ''}" data-cat="${c}">${c}</button>`).join('');
+      box.querySelectorAll('.cat-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.category = btn.dataset.cat;
+          renderCategories();
+          renderTemplates();
+        });
+      });
+    }
+
+    function renderTemplates() {
+      const grid = document.getElementById('tplGrid');
+      const list = state.category === '推荐' ? TEMPLATES : TEMPLATES.filter(t => t.cat === state.category);
+      grid.innerHTML = list.map(t => `
+        <button class="tpl-card ${state.selectedTpl === t.id ? 'active' : ''}" data-tpl="${t.id}">
+          <div class="tpl-thumb">
+            <img src="${t.img}" alt="${t.title}" />
+            <div class="tpl-badge">${poseThumbSvg(t.pose, true, state.selectedTpl === t.id ? '#34D399' : '#FFFFFF')}</div>
+          </div>
+          <div class="tpl-meta">
+            <span class="tpl-name">${t.title}</span>
+            <span class="tpl-count">${t.count}</span>
+          </div>
+        </button>
+      `).join('');
+      grid.querySelectorAll('.tpl-card').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tpl = TEMPLATES.find(x => x.id === btn.dataset.tpl);
+          if (tpl) applyTemplate(tpl, true);
+        });
+      });
+    }
+
+    function applyRetouchVisuals(holdingOriginal = false) {
+      const rImg = document.getElementById('retouchImg');
+      const rGlow = document.getElementById('retouchGlow');
+      const cAfter = document.getElementById('compareAfterImg');
+      const cGlow = document.getElementById('compareGlow');
+
+      const hasWarm = state.activeIntents.has('重塑暖阳逆光');
+      const hasSkin = state.activeIntents.has('自然皮肤保真');
+      const hasClean = state.activeIntents.has('无痕去路人') || state.activeIntents.has('衣服去褶皱');
+
+      const retouchFilter = `saturate(${hasWarm ? 1.1 : 1.02}) contrast(${hasClean ? 1.05 : 1.01}) brightness(${state.faceLock ? 1.03 : 1.07}) sepia(${hasWarm ? 0.08 : 0.01})`;
+      const originalFilter = 'saturate(0.76) contrast(0.92) brightness(0.90) hue-rotate(-8deg)';
+
+      if (holdingOriginal || state.activeIntents.size === 0) {
+        rImg.style.filter = originalFilter;
+        rGlow.style.opacity = '0';
+      } else {
+        rImg.style.filter = retouchFilter;
+        rGlow.style.opacity = hasWarm ? '1' : '0';
+      }
+
+      cAfter.style.filter = retouchFilter;
+      cGlow.style.opacity = hasWarm ? '1' : '0';
+    }
+
+    function renderIntents() {
+      const row = document.getElementById('intentRow');
+      row.innerHTML = INTENTS.map(label => `
+        <button class="intent-chip ${state.activeIntents.has(label) ? 'active' : ''}" data-intent="${label}">${label}</button>
+      `).join('');
+      row.querySelectorAll('.intent-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const k = btn.dataset.intent;
+          if (state.activeIntents.has(k)) state.activeIntents.delete(k);
+          else state.activeIntents.add(k);
+          renderIntents();
+          applyRetouchVisuals(false);
+        });
+      });
+    }
+
+    function syncRetouchPhoto(src) {
+      state.retouchSrc = src;
+      document.getElementById('albumThumbImg').src = src;
+      document.getElementById('retouchImg').src = src;
+      document.getElementById('compareAfterImg').src = src;
+      document.getElementById('compareBeforeImg').src = src;
+    }
+
+    function focusScreen(idx) {
+      state.activeScreen = idx;
+      document.querySelectorAll('.nav-link').forEach(el => {
+        el.classList.toggle('active', Number(el.dataset.screen) === idx);
+      });
+      const cols = document.querySelectorAll('.device-col');
+      cols.forEach(col => {
+        const c = Number(col.dataset.col);
+        if (state.singleMode) {
+          col.style.display = c === idx ? 'flex' : 'none';
+          col.classList.remove('dimmed');
+        } else {
+          col.style.display = 'flex';
+          col.classList.remove('dimmed');
+        }
+      });
+    }
+
+    function setViewMode(single) {
+      state.singleMode = single;
+      const root = document.getElementById('screensRoot');
+      root.className = single ? 'grid-single' : 'grid-all';
+      document.getElementById('viewModeBtn').textContent = single ? '4 屏总览' : '单机沉浸体验';
+      focusScreen(state.activeScreen);
+    }
+
+    // Wire Navigation & Mode Toggle
+    document.querySelectorAll('.nav-link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.screen);
+        focusScreen(idx);
+        if (!state.singleMode) {
+          document.querySelector(`.device-col[data-col="${idx}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-jump]').forEach(el => {
+      el.addEventListener('click', () => focusScreen(Number(el.dataset.jump)));
+    });
+
+    document.getElementById('viewModeBtn').addEventListener('click', () => setViewMode(!state.singleMode));
+
+    // Screen 1 Interactions
+    document.getElementById('flashBtn').addEventListener('click', (e) => {
+      state.flashOn = !state.flashOn;
+      e.currentTarget.style.color = state.flashOn ? '#34D399' : '#F5F5F7';
+    });
+
+    document.getElementById('ratioBtn').addEventListener('click', (e) => {
+      state.ratioIdx = (state.ratioIdx + 1) % state.ratios.length;
+      e.currentTarget.textContent = state.ratios[state.ratioIdx];
+    });
+
+    document.getElementById('guideToggleBtn').addEventListener('click', (e) => {
+      state.showGuide = !state.showGuide;
+      e.currentTarget.style.opacity = state.showGuide ? '1' : '0.45';
+      renderPoseOverlay();
+    });
+
+    document.getElementById('alignCapsule').addEventListener('click', () => {
+      state.tilt = Math.abs(state.tilt) <= 0.6 ? 1.8 : 0.0;
+      renderTiltRuler();
+      renderPoseOverlay();
+    });
+
+    let vfDragging = false, vfStartX = 0;
+    const vf = document.getElementById('viewfinder');
+    vf.addEventListener('pointerdown', (e) => { vfDragging = true; vfStartX = e.clientX; });
+    window.addEventListener('pointermove', (e) => {
+      if (!vfDragging) return;
+      const dx = e.clientX - vfStartX;
+      vfStartX = e.clientX;
+      state.tilt = Math.max(-4.5, Math.min(4.5, state.tilt + dx * 0.03));
+      renderTiltRuler();
+      renderPoseOverlay();
+    });
+    window.addEventListener('pointerup', () => {
+      if (!vfDragging) return;
+      vfDragging = false;
+      if (Math.abs(state.tilt) < 0.7) { state.tilt = 0.0; renderTiltRuler(); renderPoseOverlay(); }
+    });
+
+    document.getElementById('shutterBtn').addEventListener('click', () => {
+      const flash = document.getElementById('shutterFlash');
+      flash.classList.add('active');
+      syncRetouchPhoto(document.getElementById('vfImg').src);
+      setTimeout(() => {
+        flash.classList.remove('active');
+        showToast('已拍摄高清人像，进入 AI 精修');
+        if (state.singleMode) focusScreen(2);
+      }, 180);
+    });
+
+    document.getElementById('albumThumbBtn').addEventListener('click', () => {
+      if (state.singleMode) focusScreen(2);
+      else showToast('已在第 3 屏加载最新人像精修');
+    });
+
+    // Real photo import (Page 1 & Page 2)
+    const fileInput = document.getElementById('photoImportInput');
+    document.getElementById('camImportBtn').addEventListener('click', () => {
+      if (state.singleMode) focusScreen(1);
+      else fileInput.click();
+    });
+    document.getElementById('drawerImportBanner').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const custom = {
+        id: 'custom_' + Date.now(),
+        title: '自选样图 · 虚线提取',
+        cat: '推荐',
+        pose: 'street_side',
+        count: '刚刚导入',
+        tone: '已提取同款色调',
+        img: url,
+      };
+      TEMPLATES.unshift(custom);
+      applyTemplate(custom, true);
+      fileInput.value = '';
+    });
+
+    // Screen 3 Interactions
+    const holdBtn = document.getElementById('holdCompareBtn');
+    const holdTxt = document.getElementById('holdCompareText');
+    const startHold = () => { holdTxt.textContent = '原图预览中'; applyRetouchVisuals(true); };
+    const endHold = () => { holdTxt.textContent = '对比原图'; applyRetouchVisuals(false); };
+    holdBtn.addEventListener('pointerdown', startHold);
+    window.addEventListener('pointerup', endHold);
+
+    function runAiRetouch(note) {
+      const scan = document.getElementById('scanLine');
+      const btnText = document.getElementById('oneTapAiText');
+      scan.classList.remove('running');
+      void scan.offsetWidth;
+      scan.classList.add('running');
+      btnText.textContent = '正在按构图模板精修…';
+      setTimeout(() => {
+        btnText.textContent = '按构图模板一键精修';
+        applyRetouchVisuals(false);
+        showToast(note ? `已完成微调：${note}` : '已完成一键模板精修，可拖动对比');
+        if (state.singleMode) focusScreen(3);
+      }, 860);
+    }
+
+    document.getElementById('oneTapAiBtn').addEventListener('click', () => runAiRetouch());
+
+    const promptInput = document.getElementById('agentPromptInput');
+    const micBtn = document.getElementById('micSendBtn');
+    promptInput.addEventListener('input', () => {
+      const has = promptInput.value.trim().length > 0;
+      micBtn.classList.toggle('send', has);
+    });
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && promptInput.value.trim()) {
+        const val = promptInput.value.trim();
+        promptInput.value = '';
+        micBtn.classList.remove('send');
+        runAiRetouch(val);
+      }
+    });
+    micBtn.addEventListener('click', () => {
+      if (promptInput.value.trim()) {
+        const val = promptInput.value.trim();
+        promptInput.value = '';
+        micBtn.classList.remove('send');
+        runAiRetouch(val);
+      } else {
+        promptInput.value = '把背景路人去掉，保留脸部真实感与暖阳发丝光';
+        micBtn.classList.add('send');
+        showToast('已语音录入修图指令');
+      }
+    });
+
+    // Screen 4 Interactions: Draggable Before / After Split Line
+    const compareStage = document.getElementById('compareStage');
+    let splitDragging = false;
+    function updateSplit(clientX) {
+      const rect = compareStage.getBoundingClientRect();
+      const pct = Math.max(6, Math.min(94, ((clientX - rect.left) / rect.width) * 100));
+      state.splitPct = pct;
+      document.getElementById('compareBeforeImg').style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+      document.getElementById('splitLine').style.left = `${pct}%`;
+      document.getElementById('splitHandle').style.left = `${pct}%`;
+    }
+    compareStage.addEventListener('pointerdown', (e) => { splitDragging = true; updateSplit(e.clientX); });
+    window.addEventListener('pointermove', (e) => { if (splitDragging) updateSplit(e.clientX); });
+    window.addEventListener('pointerup', () => { splitDragging = false; });
+
+    document.getElementById('faceLockSwitch').addEventListener('click', (e) => {
+      state.faceLock = !state.faceLock;
+      e.currentTarget.classList.toggle('on', state.faceLock);
+      e.currentTarget.setAttribute('aria-checked', String(state.faceLock));
+      document.getElementById('lockSubText').textContent = state.faceLock ? '已锁定原生骨骼与皮肤质感' : '已解除锁定 · 允许光影重塑';
+      applyRetouchVisuals(false);
+    });
+
+    document.getElementById('historyToggleBtn').addEventListener('click', () => {
+      document.getElementById('historyPopover').classList.toggle('open');
+    });
+
+    // Lossless PNG Export via Offscreen Canvas
+    document.getElementById('saveLosslessBtn').addEventListener('click', () => {
+      const img = document.getElementById('compareAfterImg');
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || 900;
+      canvas.height = img.naturalHeight || 1200;
+      const ctx = canvas.getContext('2d');
+      ctx.filter = getComputedStyle(img).filter || 'none';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const link = document.createElement('a');
+      link.download = `Silu_Retouched_${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      showToast('已无损保存至相册 · 原画质 PNG');
+    });
+
+    // Initial Render
+    renderPoseStrip();
+    renderPoseOverlay();
+    renderTiltRuler();
+    renderCategories();
+    renderTemplates();
+    renderIntents();
+    applyRetouchVisuals(false);
+    if (window.innerWidth < 760) setViewMode(true);
+  </script>
+</body>
+</html>
